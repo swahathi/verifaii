@@ -7,3 +7,15 @@ __pycache__/
 dist/
 build/
 *.pyc
+
+# Dataset images (prevent pushing 50k+ raw images to GitHub)
+data/ai/
+data/real/
+data/*.jpg
+data/*.jpeg
+data/*.png
+data/*.webp
+data/*.bmp
+
+# Scratch scripts
+scratch/

@@ -1,6 +1,6 @@
 """
 Metadata Extraction Module
-Extracts EXIF metadata safely without crashing on corrupted headers.
+Extracts EXIF metadata safely without crashing on corrupted headers or spamming logs.
 Flags AI generator signatures while properly handling missing metadata.
 """
 
@@ -16,6 +16,7 @@ AI_SOFTWARE_KEYWORDS = [
     "stable diffusion",
     "stablediffusion",
     "dall-e",
+    "dalle",
     "comfyui",
     "automatic1111",
     "novelai",
@@ -51,55 +52,57 @@ def extract_metadata(image_path: str) -> Dict[str, Any]:
     if not os.path.exists(image_path):
         return metadata
 
-    # 1. First pass using ExifRead
-    try:
-        with open(image_path, "rb") as f:
-            tags = exifread.process_file(f, details=False)
-            if tags:
-                metadata["has_exif"] = 1
-                metadata["raw_tag_count"] = len(tags)
+    ext = os.path.splitext(image_path)[1].lower()
 
-                if "Image Make" in tags:
-                    make_str = str(tags["Image Make"]).strip()
-                    if make_str:
-                        metadata["camera_make"] = make_str
-                        metadata["has_camera_make"] = 1
+    # 1. Use ExifRead primarily for JPEG and TIFF images (avoiding PNG warning spam)
+    if ext in (".jpg", ".jpeg", ".tiff", ".tif"):
+        try:
+            with open(image_path, "rb") as f:
+                tags = exifread.process_file(f, details=False, stop_tag="UNDEF")
+                if tags:
+                    metadata["has_exif"] = 1
+                    metadata["raw_tag_count"] = len(tags)
 
-                if "Image Model" in tags:
-                    model_str = str(tags["Image Model"]).strip()
-                    if model_str:
-                        metadata["camera_model"] = model_str
-                        metadata["has_camera_model"] = 1
+                    if "Image Make" in tags:
+                        make_str = str(tags["Image Make"]).strip()
+                        if make_str:
+                            metadata["camera_make"] = make_str
+                            metadata["has_camera_make"] = 1
 
-                if "EXIF DateTimeOriginal" in tags:
-                    dt_str = str(tags["EXIF DateTimeOriginal"]).strip()
-                    if dt_str:
-                        metadata["datetime_original"] = dt_str
-                        metadata["has_datetime_original"] = 1
+                    if "Image Model" in tags:
+                        model_str = str(tags["Image Model"]).strip()
+                        if model_str:
+                            metadata["camera_model"] = model_str
+                            metadata["has_camera_model"] = 1
 
-                if "Image Software" in tags:
-                    sw_str = str(tags["Image Software"]).strip()
-                    if sw_str:
-                        metadata["software"] = sw_str
-                        metadata["has_software"] = 1
-                        sw_lower = sw_str.lower()
-                        if any(kw in sw_lower for kw in AI_SOFTWARE_KEYWORDS):
-                            metadata["software_is_ai"] = 1
+                    if "EXIF DateTimeOriginal" in tags:
+                        dt_str = str(tags["EXIF DateTimeOriginal"]).strip()
+                        if dt_str:
+                            metadata["datetime_original"] = dt_str
+                            metadata["has_datetime_original"] = 1
 
-                if "EXIF ISOSpeedRatings" in tags:
-                    try:
-                        metadata["iso_speed"] = float(str(tags["EXIF ISOSpeedRatings"]))
-                    except (ValueError, TypeError):
-                        pass
-    except Exception:
-        # Graceful fallback for corrupted headers
-        pass
+                    if "Image Software" in tags:
+                        sw_str = str(tags["Image Software"]).strip()
+                        if sw_str:
+                            metadata["software"] = sw_str
+                            metadata["has_software"] = 1
+                            sw_lower = sw_str.lower()
+                            if any(kw in sw_lower for kw in AI_SOFTWARE_KEYWORDS):
+                                metadata["software_is_ai"] = 1
 
-    # 2. Secondary fallback pass with Pillow if ExifRead found no EXIF
+                    if "EXIF ISOSpeedRatings" in tags:
+                        try:
+                            metadata["iso_speed"] = float(str(tags["EXIF ISOSpeedRatings"]))
+                        except (ValueError, TypeError):
+                            pass
+        except Exception:
+            pass
+
+    # 2. Universal pass with Pillow (for PNG, WebP, or fallback when ExifRead found no EXIF)
     if metadata["has_exif"] == 0:
         try:
             with Image.open(image_path) as img:
-                info = img._getexif()
+                info = getattr(img, "_getexif", lambda: None)()
                 if info:
                     metadata["has_exif"] = 1
                     metadata["raw_tag_count"] = len(info)
@@ -120,6 +123,16 @@ def extract_metadata(image_path: str) -> Dict[str, Any]:
                         elif tag_name == "DateTimeOriginal" and value:
                             metadata["datetime_original"] = str(value).strip()
                             metadata["has_datetime_original"] = 1
+
+                # Check PNG/WebP text metadata
+                if hasattr(img, "text") and isinstance(img.text, dict):
+                    for k, v in img.text.items():
+                        k_lower = str(k).lower()
+                        v_lower = str(v).lower()
+                        if any(kw in v_lower for kw in AI_SOFTWARE_KEYWORDS) or any(kw in k_lower for kw in AI_SOFTWARE_KEYWORDS):
+                            metadata["has_software"] = 1
+                            metadata["software"] = str(v)[:60]
+                            metadata["software_is_ai"] = 1
         except Exception:
             pass
 
