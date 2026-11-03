@@ -1,4 +1,10 @@
-# AI-Generated Image Detection System Using Metadata & Visual Feature Analysis
+# VerifAI — AI-Generated Image Detection System Using Metadata & Visual Feature Analysis
+
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://verifaii.streamlit.app/)
+&nbsp;
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit-FF4B4B?style=flat&logo=streamlit&logoColor=white)](https://verifaii.streamlit.app/)
+
+> 🌐 **Live Demo:** [https://verifaii.streamlit.app/](https://verifaii.streamlit.app/)
 
 A Data Mining and Machine Learning project that classifies images as **Real** or **AI-Generated** using computer vision visual feature extraction and EXIF metadata analysis.
 
@@ -27,7 +33,7 @@ This system bridges digital forensics, classical computer vision, and machine le
 
 ## 2. Directory Structure
 ```text
-ai_image_detector/
+verifaii/
 ├── data/
 │   ├── real/                 # Real photographic images
 │   └── ai/                   # AI-generated images
@@ -42,6 +48,7 @@ ai_image_detector/
 ├── app.py                    # Streamlit web application
 ├── experiment_notebook.ipynb # Jupyter notebook for interactive experimentation
 ├── requirements.txt          # Python dependencies
+├── packages.txt              # Linux system dependencies (libgl1)
 └── README.md                 # Project documentation
 ```
 
